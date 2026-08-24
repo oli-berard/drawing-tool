@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Satisfying ASMR Doodle Pad - Undo/Redo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { touch-action: none; box-sizing: border-box; }
+    body { 
+      margin: 0; 
+      display: flex; 
+      flex-direction: column; 
+      height: 100vh; 
+      background: #f0f2f5; 
+      font-family: 'Fredoka', system-ui, -apple-system, sans-serif; 
+      color: #333;
+    }
+    
+    #toolbar { 
+      display: flex; 
+      gap: 10px; 
+      padding: 10px 14px; 
+      background: #ffffff; 
+      align-items: center; 
+      justify-content: center; 
+      flex-wrap: wrap; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      z-index: 10;
+    }
+
+    .color-group { display: flex; gap: 6px; align-items: center; }
+    
+    .color-btn { 
+      width: 28px; height: 28px; border-radius: 50%; border: 3px solid #ffffff; 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15); cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .color-btn.active {
+      transform: scale(1.18); border-color: #222222;
+      box-shadow: 0 0 0 3px #ffffff, 0 3px 8px rgba(0,0,0,0.3);
+    }
+
+    .selector-group {
+      display: flex; background: #e4e7ed; padding: 3px; border-radius: 20px; gap: 3px;
+    }
+    .tool-btn {
+      padding: 5px 12px; font-family: inherit; font-size: 13px; font-weight: 700;
+      border: none; border-radius: 16px; background: transparent; color: #555;
+      cursor: pointer; transition: all 0.15s ease;
+    }
+    .tool-btn.active {
+      background: #ffffff; color: #111; box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+    }
+    .tool-btn:disabled {
+      opacity: 0.35; cursor: not-allowed; box-shadow: none; color: #888;
+    }
+
+    .slider-container {
+      display: flex; align-items: center; gap: 8px; background: #f0f2f5;
+      padding: 5px 12px; border-radius: 24px; font-size: 13px; font-weight: 600;
+    }
+
+    #brush-preview {
+      width: 10px; height: 10px; border-radius: 50%; background: #222222;
+      transition: width 0.1s ease, height 0.1s ease;
+    }
+
+    input[type=range] { -webkit-appearance: none; width: 65px; background: transparent; }
+    input[type=range]:focus { outline: none; }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%; height: 6px; cursor: pointer; background: #dcdfe6; border-radius: 3px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 18px; width: 18px; border-radius: 50%; background: #ffffff;
+      border: 2px solid #333333; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      cursor: pointer; -webkit-appearance: none; margin-top: -6px;
+    }
+
+    .action-btn {
+      padding: 6px 12px; font-family: inherit; font-size: 13px; font-weight: 600;
+      border-radius: 18px; cursor: pointer; border: 1.5px solid transparent;
+      transition: transform 0.1s ease, background-color 0.15s ease;
+    }
+    .action-btn:active:not(:disabled) { transform: scale(0.92); }
+    
+    .clear-btn { color: #ff3366; background: #fff0f3; border-color: #ffccd5; }
+    .clear-btn:active { background: #ffe0e6; }
+    
+    .history-btn { background: #e4e7ed; color: #333; }
+    .history-btn:hover:not(:disabled) { background: #d5d9e2; }
+
+    canvas { flex: 1; background: #fafafd; cursor: crosshair; opacity: 1; transition: opacity 0.15s ease; }
+    canvas.clearing { opacity: 0.2; }
+  </style>
+</head>
+<body>
+
+  <div id="toolbar">
+    <div class="color-group">
+      <button class="color-btn active" style="background: #222222;" onclick="setColor('#222222', this)"></button>
+      <button class="color-btn" style="background: #ff3b30;" onclick="setColor('#ff3b30', this)"></button>
+      <button class="color-btn" style="background: #ff9500;" onclick="setColor('#ff9500', this)"></button>
+      <button class="color-btn" style="background: #34c759;" onclick="setColor('#34c759', this)"></button>
+      <button class="color-btn" style="background: #007aff;" onclick="setColor('#007aff', this)"></button>
+      <button class="color-btn" style="background: #5856d6;" onclick="setColor('#5856d6', this)"></button>
+    </div>
+
+    <!-- Mode/Shape Selector -->
+    <div class="selector-group">
+      <button class="tool-btn active" onclick="setMode('DRAW', this)">✏️ Draw</button>
+      <button class="tool-btn" onclick="setMode('TRIANGLE', this)">▲ Triangle</button>
+      <button class="tool-btn" onclick="setMode('RECT', this)">■ Square</button>
+      <button class="tool-btn" onclick="setMode('CIRCLE', this)">● Circle</button>
+    </div>
+
+    <!-- Sound Medium Selector -->
+    <div class="selector-group">
+      <button class="tool-btn active" onclick="setMedium('MARKER', this)">Marker</button>
+      <button class="tool-btn" onclick="setMedium('CHALK', this)">Chalk</button>
+      <button class="tool-btn" onclick="setMedium('CHARCOAL', this)">Charcoal</button>
+      <button class="tool-btn" onclick="setMedium('PENCIL', this)">Pencil</button>
+    </div>
+
+    <div class="slider-container">
+      <span>Size</span>
+      <input type="range" id="size" min="2" max="50" value="10" oninput="updateSizePreview(this.value)">
+      <div id="brush-preview"></div>
+    </div>
+
+    <button class="action-btn history-btn" id="undo-btn" onclick="undo()" disabled>↶ Undo</button>
+    <button class="action-btn history-btn" id="redo-btn" onclick="redo()" disabled>↷ Redo</button>
+    <button class="action-btn clear-btn" onclick="clearCanvas()">Clear</button>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let isInteracting = false;
+    let currentMode = 'DRAW'; 
+    let currentColor = '#222222';
+    let currentMedium = 'MARKER';
+    
+    let startPos = { x: 0, y: 0 };
+    let currentPos = { x: 0, y: 0 };
+    let lastPos = { x: 0, y: 0 };
+    let canvasSnapshot = null;
+
+    // --- HISTORY / UNDO-REDO STATE --- //
+    let historyStack = [];
+    let historyIndex = -1;
+    const maxHistory = 30;
+
+    function saveState() {
+      if (historyIndex < historyStack.length - 1) {
+        historyStack = historyStack.slice(0, historyIndex + 1);
+      }
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      historyStack.push(imageData);
+      if (historyStack.length > maxHistory) {
+        historyStack.shift();
+      } else {
+        historyIndex++;
+      }
+      updateUndoRedoButtons();
+    }
+
+    function undo() {
+      if (historyIndex > 0) {
+        historyIndex--;
+        ctx.putImageData(historyStack[historyIndex], 0, 0);
+        playChime(550, 350, 0.05);
+        updateUndoRedoButtons();
+      } else if (historyIndex === 0) {
+        historyIndex--;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        playChime(550, 350, 0.05);
+        updateUndoRedoButtons();
+      }
+    }
+
+    function redo() {
+      if (historyIndex < historyStack.length - 1) {
+        historyIndex++;
+        ctx.putImageData(historyStack[historyIndex], 0, 0);
+        playChime(350, 550, 0.05);
+        updateUndoRedoButtons();
+      }
+    }
+
+    function updateUndoRedoButtons() {
+      const undoBtn = document.getElementById('undo-btn');
+      const redoBtn = document.getElementById('redo-btn');
+      undoBtn.disabled = historyIndex < 0;
+      redoBtn.disabled = historyIndex >= historyStack.length - 1;
+    }
+
+    // --- SOFTENED ASMR SOUND ENGINE --- //
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let noiseNode = null;
+    let filterNode = null;
+    let gainNode = null;
+
+    function createNoiseBuffer() {
+      const bufferSize = audioCtx.sampleRate * 2;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+      return buffer;
+    }
+    const noiseBuffer = createNoiseBuffer();
+
+    function startASMRSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      noiseNode = audioCtx.createBufferSource();
+      noiseNode.buffer = noiseBuffer;
+      noiseNode.loop = true;
+
+      filterNode = audioCtx.createBiquadFilter();
+      gainNode = audioCtx.createGain();
+
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+
+      noiseNode.connect(filterNode);
+      filterNode.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      noiseNode.start();
+    }
+
+    function updateASMRSound(speed) {
+      if (!gainNode || !filterNode) return;
+      const now = audioCtx.currentTime;
+      const normSpeed = Math.min(Math.max(speed, 0), 25);
+
+      if (currentMedium === 'MARKER') {
+        filterNode.type = 'bandpass';
+        filterNode.frequency.setValueAtTime(600 + normSpeed * 80, now);
+        filterNode.Q.setValueAtTime(1.8, now);
+        gainNode.gain.setTargetAtTime(Math.min(normSpeed * 0.015, 0.08), now, 0.05);
+
+      } else if (currentMedium === 'CHALK') {
+        filterNode.type = 'lowpass';
+        filterNode.frequency.setValueAtTime(800 + normSpeed * 120, now);
+        filterNode.Q.setValueAtTime(0.7, now);
+        gainNode.gain.setTargetAtTime(Math.min(normSpeed * 0.02, 0.12), now, 0.04);
+
+      } else if (currentMedium === 'CHARCOAL') {
+        filterNode.type = 'bandpass';
+        filterNode.frequency.setValueAtTime(350 + normSpeed * 50, now);
+        filterNode.Q.setValueAtTime(0.6, now);
+        gainNode.gain.setTargetAtTime(Math.min(normSpeed * 0.025, 0.14), now, 0.04);
+
+      } else { // PENCIL
+        filterNode.type = 'bandpass';
+        filterNode.frequency.setValueAtTime(1600 + normSpeed * 100, now);
+        filterNode.Q.setValueAtTime(0.5, now);
+        gainNode.gain.setTargetAtTime(Math.min(normSpeed * 0.01, 0.06), now, 0.05);
+      }
+    }
+
+    function stopASMRSound() {
+      if (gainNode) {
+        gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+        setTimeout(() => {
+          if (noiseNode) {
+            try { noiseNode.stop(); } catch(e) {}
+            noiseNode.disconnect();
+          }
+        }, 100);
+      }
+    }
+
+    // --- SOUND UTILITIES --- //
+    function playChime(freqStart, freqEnd, duration) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freqStart, now);
+      osc.frequency.exponentialRampToValueAtTime(freqEnd, now + duration);
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    }
+
+    function playTechnicalClearSound() {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+
+      const osc1 = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const techGain = audioCtx.createGain();
+
+      osc1.type = 'sine';
+      osc2.type = 'triangle';
+      osc1.frequency.setValueAtTime(780, now);
+      osc1.frequency.exponentialRampToValueAtTime(110, now + 0.1);
+      osc2.frequency.setValueAtTime(1560, now);
+      osc2.frequency.exponentialRampToValueAtTime(220, now + 0.1);
+
+      techGain.gain.setValueAtTime(0.08, now);
+      techGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+      osc1.connect(techGain);
+      osc2.connect(techGain);
+      techGain.connect(audioCtx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.1);
+      osc2.stop(now + 0.1);
+    }
+
+    // --- CANVAS APP LOGIC --- //
+    function resize() {
+      const prevData = canvas.width > 0 ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight - document.getElementById('toolbar').offsetHeight;
+      
+      if (prevData) {
+        ctx.putImageData(prevData, 0, 0);
+      } else {
+        historyStack = [];
+        historyIndex = -1;
+        saveState(); // save initial blank state
+      }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function setColor(color, btn) { 
+      currentColor = color; 
+      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('brush-preview').style.background = color;
+    }
+
+    function setMode(mode, btn) {
+      currentMode = mode;
+      const group = btn.parentElement;
+      group.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function setMedium(medium, btn) {
+      currentMedium = medium;
+      const group = btn.parentElement;
+      group.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function updateSizePreview(val) {
+      const preview = document.getElementById('brush-preview');
+      preview.style.width = `${val}px`;
+      preview.style.height = `${val}px`;
+    }
+
+    function clearCanvas() { 
+      playTechnicalClearSound();
+      canvas.classList.add('clearing');
+      
+      setTimeout(() => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.classList.remove('clearing');
+        saveState();
+      }, 100);
+    }
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function applyBrushStyles() {
+      ctx.strokeStyle = currentColor;
+      ctx.fillStyle = currentColor;
+      ctx.lineWidth = document.getElementById('size').value;
+
+      if (currentMedium === 'MARKER') {
+        ctx.globalAlpha = 0.85; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      } else if (currentMedium === 'CHALK') {
+        ctx.globalAlpha = 0.5; ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+      } else if (currentMedium === 'CHARCOAL') {
+        ctx.globalAlpha = 0.35; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      } else { // PENCIL
+        ctx.globalAlpha = 0.9; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      }
+    }
+
+    function drawShape(from, to, mode) {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+
+      ctx.beginPath();
+      if (mode === 'RECT') {
+        ctx.rect(from.x, from.y, dx, dy);
+      } else if (mode === 'CIRCLE') {
+        const radius = Math.sqrt(dx * dx + dy * dy);
+        ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
+      } else if (mode === 'TRIANGLE') {
+        ctx.moveTo(from.x, from.y - dy);
+        ctx.lineTo(from.x - dx, from.y + dy);
+        ctx.lineTo(from.x + dx, from.y + dy);
+        ctx.closePath();
+      }
+      ctx.stroke();
+    }
+
+    function startInteraction(e) {
+      isInteracting = true;
+      const pos = getPos(e);
+      startPos = pos;
+      currentPos = pos;
+      lastPos = pos;
+
+      startASMRSound();
+
+      if (currentMode === 'DRAW') {
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+      } else {
+        canvasSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    function moveInteraction(e) {
+      if (!isInteracting) return;
+      const pos = getPos(e);
+
+      const dx = pos.x - lastPos.x;
+      const dy = pos.y - lastPos.y;
+      const speed = Math.sqrt(dx * dx + dy * dy);
+      updateASMRSound(speed);
+
+      applyBrushStyles();
+
+      if (currentMode === 'DRAW') {
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      } else {
+        ctx.putImageData(canvasSnapshot, 0, 0);
+        drawShape(startPos, pos, currentMode);
+      }
+
+      lastPos = pos;
+    }
+
+    function stopInteraction() {
+      if (isInteracting) {
+        stopASMRSound();
+        saveState();
+      }
+      isInteracting = false;
+      canvasSnapshot = null;
+    }
+
+    canvas.addEventListener('mousedown', startInteraction);
+    canvas.addEventListener('mousemove', moveInteraction);
+    canvas.addEventListener('mouseup', stopInteraction);
+    canvas.addEventListener('mouseleave', stopInteraction);
+
+    canvas.addEventListener('touchstart', startInteraction);
+    canvas.addEventListener('touchmove', moveInteraction);
+    canvas.addEventListener('touchend', stopInteraction);
+
+    updateSizePreview(document.getElementById('size').value);
+  </script>
+</body>
+</html>
